@@ -1,0 +1,15 @@
+{
+  "functions": {
+    "api/sheets/*.js": { "memory": 256, "maxDuration": 30 },
+    "api/webhook.js": { "memory": 256, "maxDuration": 25 },
+    "api/cron/*.js": { "memory": 256, "maxDuration": 30 }
+  },
+  "crons": [
+    { "path": "/api/cron/check?phase=morning&secret=${CRON_SECRET}", "schedule": "30 6 * * *" },
+    { "path": "/api/cron/check?phase=midday&secret=${CRON_SECRET}", "schedule": "30 11 * * *" },
+    { "path": "/api/cron/check?phase=evening&secret=${CRON_SECRET}", "schedule": "30 17 * * *" },
+    { "path": "/api/cron/check?phase=night_review&secret=${CRON_SECRET}", "schedule": "30 20 * * *" },
+    { "path": "/api/cron/check?phase=zero_progress&secret=${CRON_SECRET}", "schedule": "30 12 * * *" },
+    { "path": "/api/cron/check?phase=habit_warning&secret=${CRON_SECRET}", "schedule": "0 7 * * *" }
+  ]
+}

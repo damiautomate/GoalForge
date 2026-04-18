@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users — own profile (full read/write), but limited read for team members
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Yearly plans — user owns their own
+    match /yearlyPlans/{userId}/{year}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Monthly goals — owner full access, team members can read
+    match /monthlyGoals/{userId}/{yearMonth}/{goalId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // 66-day habits — owner full access, team can read
+    match /habits66/{userId}/{habitId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Weekly plans
+    match /weeklyPlans/{userId}/{yearMonth}/{weekId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Daily tasks — owner full access, team can read
+    match /dailyTasks/{userId}/{date} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Daily plans (AI-generated)
+    match /dailyPlans/{userId}/{date} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Sheet links
+    match /sheetLinks/{userId}/{yearMonth}/{doc} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Monthly reports
+    match /monthlyReports/{userId}/{yearMonth} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Bot state (conversation history, phase tracking)
+    match /botConversations/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+    }
+    match /botCronState/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Assigned tasks (readable by assignees, writable by creators)
+    match /assignedTasks/{taskId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+    }
+    
+    // Teams — leader manages, all auth users can read/update (for joining)
+    match /teams/{teamId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+    }
+  }
+}
