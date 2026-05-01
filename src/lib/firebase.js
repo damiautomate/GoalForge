@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 
 const firebaseConfig = {
   // Replace with your Firebase project config
@@ -18,6 +18,6 @@ export const db = getFirestore(app);
 
 export {
   onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  signOut, updateProfile, doc, setDoc, getDoc, updateDoc, collection, query,
+  signOut, updateProfile, doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query,
   where, getDocs, serverTimestamp
 };

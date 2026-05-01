@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './lib/useAuth';
 import { ThemeCtx, themes } from './lib/theme';
 import AuthPage from './pages/AuthPage';
+import ProfileEnrichmentSetup from './pages/ProfileEnrichmentSetup';
 import YearlyPlanSetup from './pages/YearlyPlanSetup';
 import Dashboard from './pages/Dashboard';
 import GoalsPage from './pages/GoalsPage';
@@ -48,6 +49,11 @@ export default function App() {
       }}>
         {!user ? (
           <AuthPage/>
+        ) : !profile?.hasEnrichedProfile ? (
+          <ProfileEnrichmentSetup
+            onComplete={() => setProfile(prev => ({ ...prev, hasEnrichedProfile: true }))}
+            onSkip={() => setProfile(prev => ({ ...prev, hasEnrichedProfile: 'skipped' }))}
+          />
         ) : !profile?.hasYearlyPlan ? (
           <YearlyPlanSetup onComplete={() => setProfile(prev => ({ ...prev, hasYearlyPlan: true }))}/>
         ) : (

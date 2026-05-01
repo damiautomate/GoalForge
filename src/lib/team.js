@@ -1,5 +1,5 @@
 // Team service — handles team creation, joining, member tree, and invite codes
-import { db, doc, setDoc, getDoc, updateDoc, collection, getDocs, serverTimestamp } from './firebase';
+import { db, doc, setDoc, getDoc, updateDoc, deleteDoc, collection, getDocs, serverTimestamp } from './firebase';
 import { query, where, limit } from 'firebase/firestore';
 
 // ── Generate unique invite code ──
@@ -256,6 +256,169 @@ export async function completeAssignedTask({ taskId, uid, proof = '' }) {
   await updateDoc(taskRef, { completions });
 
   return true;
+}
+
+// ── Edit / delete an assigned task (leader only) ──
+export async function updateAssignedTask(taskId, updates) {
+  await updateDoc(doc(db, 'assignedTasks', taskId), updates);
+}
+
+export async function deleteAssignedTask(taskId) {
+  await deleteDoc(doc(db, 'assignedTasks', taskId));
+}
+
+// ── Member earnings (leader views aggregate across team) ──
+export async function getMemberEarningsThisMonth(uid) {
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  try {
+    const snap = await getDocs(collection(db, 'earnings', uid, ym));
+    let total = 0;
+    snap.forEach(d => { total += (d.data().amount || 0); });
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
+// ── Leaderboard score: weighted blend of goal completion + habit + assigned tasks ──
+// Returns 0-100. Uses three sub-scores:
+//   - 50% : monthly goal avg progress %
+//   - 30% : 66-day habit consistency %
+//   - 20% : assigned task completion %
+export function computeMemberScore({ avgGoalProgress = 0, habitConsistency = 0, assignedCompletion = 0 }) {
+  const a = Math.max(0, Math.min(100, avgGoalProgress));
+  const b = Math.max(0, Math.min(100, habitConsistency));
+  const c = Math.max(0, Math.min(100, assignedCompletion));
+  return Math.round(0.5 * a + 0.3 * b + 0.2 * c);
+}
+
+// ── Build leaderboard data for a team. ──
+// Returns sorted list of [{ uid, name, memberId, score, goalProgress, habitConsistency, assignedCompletion, earnings, optedOut }]
+export async function getLeaderboard(teamId, leaderUid) {
+  const members = await getTeamMembers(teamId);
+  const allTasks = await getAssignedTasksByLeader(leaderUid);
+
+  const rows = [];
+  for (const m of members) {
+    const optedOut = m.leaderboardOptOut === true;
+
+    // Goal progress
+    const summary = await getMemberProgressSummary(m.uid).catch(() => null);
+    const avgGoalProgress = summary?.avgProgress ?? 0;
+
+    // Habit consistency
+    let habitConsistency = 0;
+    try {
+      const hSnap = await getDocs(collection(db, 'habits66', m.uid));
+      hSnap.forEach(d => {
+        const h = d.data();
+        if (h.status === 'active') {
+          const hist = h.history || [];
+          if (hist.length) {
+            const done = hist.filter(x => x.completed).length;
+            habitConsistency = Math.round((done / hist.length) * 100);
+          }
+        }
+      });
+    } catch {}
+
+    // Assigned task completion
+    const assignedToMe = allTasks.filter(t => (t.assignedTo || []).includes(m.uid));
+    let totalAssigned = 0, completedAssigned = 0;
+    for (const t of assignedToMe) {
+      totalAssigned += 1;
+      if (t.completions?.[m.uid]?.done) completedAssigned += 1;
+    }
+    const assignedCompletion = totalAssigned ? Math.round((completedAssigned / totalAssigned) * 100) : 0;
+
+    // Earnings this month
+    const earnings = await getMemberEarningsThisMonth(m.uid);
+
+    const score = computeMemberScore({ avgGoalProgress, habitConsistency, assignedCompletion });
+
+    rows.push({
+      uid: m.uid,
+      name: m.name || 'Unknown',
+      memberId: m.memberId,
+      score,
+      avgGoalProgress,
+      habitConsistency,
+      assignedCompletion,
+      earnings,
+      optedOut,
+    });
+  }
+
+  return rows.sort((a, b) => b.score - a.score);
+}
+
+// ── Behind-pace detection: members whose avg progress < expected for time elapsed ──
+// e.g. on day 18 of a 30-day month, expected ~60%; flag anyone < 50% of expected.
+export async function getMembersBehindPace(teamId, leaderUid) {
+  const members = await getTeamMembers(teamId);
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const expectedProgress = Math.round((dayOfMonth / daysInMonth) * 100);
+  const threshold = Math.max(0, expectedProgress - 25); // 25 pts below pace = behind
+
+  const behind = [];
+  for (const m of members) {
+    if (m.uid === leaderUid) continue;
+    const summary = await getMemberProgressSummary(m.uid).catch(() => null);
+    if (!summary) continue;
+    if (summary.goalCount > 0 && summary.avgProgress < threshold) {
+      behind.push({
+        uid: m.uid, name: m.name, memberId: m.memberId,
+        avgProgress: summary.avgProgress,
+        expected: expectedProgress,
+        gap: expectedProgress - summary.avgProgress,
+      });
+    }
+  }
+  return behind.sort((a, b) => b.gap - a.gap);
+}
+
+// ── Toggle leaderboard for a whole team (leader only) ──
+export async function setTeamLeaderboardEnabled(teamId, enabled) {
+  await updateDoc(doc(db, 'teams', teamId), { leaderboardEnabled: !!enabled });
+}
+
+// ── Member opt-out toggle ──
+export async function setMemberLeaderboardOptOut(uid, optOut) {
+  await updateDoc(doc(db, 'users', uid), { leaderboardOptOut: !!optOut });
+}
+
+// ── Aggregate fines outstanding for whole team (leader view) ──
+export async function getTeamFinesSummary(teamId, leaderUid) {
+  const tasks = await getAssignedTasksByLeader(leaderUid);
+  const members = await getTeamMembers(teamId);
+  const memberById = new Map(members.map(m => [m.uid, m]));
+  const now = new Date();
+
+  const perMember = new Map(); // uid -> { name, total, overdueCount }
+
+  for (const t of tasks) {
+    if (!t.deadline) continue;
+    if (new Date(t.deadline) >= now) continue;
+    for (const memberUid of t.assignedTo || []) {
+      if (t.excludedFromFines?.includes(memberUid)) continue;
+      const completion = t.completions?.[memberUid];
+      if (completion?.done) continue;
+
+      const cur = perMember.get(memberUid) || {
+        uid: memberUid,
+        name: memberById.get(memberUid)?.name || 'Unknown',
+        total: 0, overdueCount: 0,
+      };
+      cur.total += t.fineAmount || 200;
+      cur.overdueCount += 1;
+      perMember.set(memberUid, cur);
+    }
+  }
+
+  return Array.from(perMember.values()).sort((a, b) => b.total - a.total);
 }
 
 export async function calculateMemberFines(uid) {

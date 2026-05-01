@@ -8,12 +8,14 @@ import {
   completeAssignedTask, calculateMemberFines,
 } from '../lib/team';
 import AssignTaskModal from '../components/AssignTaskModal';
+import LeadDashboard from '../components/LeadDashboard';
+import Leaderboard from '../components/Leaderboard';
 
 export default function TeamPage() {
   const t = useTheme();
   const [profile, setProfile] = useState(null);
   const [team, setTeam] = useState(null);
-  const [tab, setTab] = useState('overview'); // overview | tasks | members
+  const [tab, setTab] = useState('overview'); // overview | lead | tasks | members
   const [downlineTree, setDownlineTree] = useState([]);
   const [assignedTasks, setAssignedTasks] = useState([]);
   const [showAssign, setShowAssign] = useState(false);
@@ -283,6 +285,7 @@ export default function TeamPage() {
       <div style={{ display: "flex", gap: 4, marginBottom: 16, background: t.bgSurface, borderRadius: 10, padding: 3 }}>
         {[
           { k: 'overview', l: 'Overview' },
+          ...(isLeader ? [{ k: 'lead', l: '👑 Lead' }] : []),
           { k: 'tasks', l: `Tasks${assignedTasks.length ? ` (${assignedTasks.length})` : ''}` },
           { k: 'members', l: `Tree${directDownlineCount ? ` (${directDownlineCount})` : ''}` },
         ].map(s => (
@@ -335,6 +338,12 @@ export default function TeamPage() {
             </Card>
           </div>
 
+          {/* Leaderboard for everyone (when enabled by leader) */}
+          {team?.leaderboardEnabled && team?.leaderId && (
+            <Leaderboard teamId={team.id} leaderUid={team.leaderId}
+              enabled={true} showTop={5} currentUserUid={uid}/>
+          )}
+
           {/* Leader actions */}
           {isLeader && (
             <Button onClick={() => setShowAssign(true)} style={{ marginBottom: 12 }}>
@@ -342,6 +351,11 @@ export default function TeamPage() {
             </Button>
           )}
         </>
+      )}
+
+      {/* LEAD (leader only) */}
+      {tab === 'lead' && isLeader && team && (
+        <LeadDashboard team={team} profile={profile} onChange={loadData}/>
       )}
 
       {/* TASKS */}
