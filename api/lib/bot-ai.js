@@ -61,6 +61,19 @@ YEARLY PLAN:
     prompt += `\n\nLAST MONTH: ${ctx.lastMonthReport.goalsCompleted}/${ctx.lastMonthReport.goalsSet} goals completed (${ctx.lastMonthReport.completionRate}%)`;
   }
 
+  if (ctx.profileEnrichment) {
+    const p = ctx.profileEnrichment;
+    prompt += `\n\nABOUT THE USER (use this to calibrate tone & advice — never quote it back verbatim):`;
+    if (p.careerLevel) prompt += `\n- Career level: ${p.careerLevel}`;
+    if (p.lifeStage) prompt += `\n- Life stage: ${p.lifeStage}`;
+    if (p.incomeTier) prompt += `\n- Current monthly earnings tier: ${p.incomeTier}`;
+    if (p.achievements) prompt += `\n- Past wins: ${p.achievements}`;
+    if (p.hoursPerDay) prompt += `\n- Hours/day available: ${p.hoursPerDay}`;
+    if (p.bestTimeOfDay) prompt += `\n- Best time of day: ${p.bestTimeOfDay}`;
+    if (p.focusStyle) prompt += `\n- Focus style: ${p.focusStyle}`;
+    if (p.notes) prompt += `\n- Personal notes: ${p.notes}`;
+  }
+
   prompt += `
 
 YOUR PERSONALITY & RULES:

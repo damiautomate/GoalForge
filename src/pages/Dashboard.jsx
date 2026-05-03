@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { auth, db, doc, getDoc, collection, getDocs } from '../lib/firebase';
-import { useTheme, Card, ProgressRing, ProgressBar, SectionHeader, PageTitle, pct, paceText, goalColor } from '../lib/theme';
+import { useTheme, Card, ProgressBar, SectionHeader, PageTitle, pct, paceText, goalColor } from '../lib/theme';
+import DailyInsightCard from '../components/DailyInsightCard';
+import EarningsCard from '../components/EarningsCard';
 
 export default function Dashboard() {
   const t = useTheme();
   const [goals, setGoals] = useState([]);
   const [habit, setHabit] = useState(null);
   const [plan, setPlan] = useState(null);
+  const [weeklyPlans, setWeeklyPlans] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,22 +23,29 @@ export default function Dashboard() {
     const year = String(now.getFullYear());
 
     try {
-      // Load monthly goals
       const goalsSnap = await getDocs(collection(db, 'monthlyGoals', uid, ym));
       const goalsData = [];
       goalsSnap.forEach(d => goalsData.push({ id: d.id, ...d.data() }));
       setGoals(goalsData);
 
-      // Load yearly plan
       const planSnap = await getDoc(doc(db, 'yearlyPlans', uid, year, 'plan'));
       if (planSnap.exists()) setPlan(planSnap.data());
 
-      // Load active habit
       const habitsSnap = await getDocs(collection(db, 'habits66', uid));
       habitsSnap.forEach(d => {
         const h = d.data();
         if (h.status === 'active') setHabit({ id: d.id, ...h });
       });
+
+      // Load this month's weekly plans for insight context
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const totalWeeks = Math.ceil(daysInMonth / 7);
+      const weeks = [];
+      for (let w = 1; w <= totalWeeks; w++) {
+        const wSnap = await getDoc(doc(db, 'weeklyPlans', uid, ym, `week${w}`));
+        if (wSnap.exists()) weeks.push({ weekNumber: w, ...wSnap.data() });
+      }
+      setWeeklyPlans(weeks);
     } catch (e) { console.error(e); }
     setLoading(false);
   }
@@ -47,12 +57,11 @@ export default function Dashboard() {
   const overall = goals.length ? Math.round(goals.reduce((s, g) => s + pct(g.current || 0, g.target || 1), 0) / goals.length) : 0;
 
   const habitDay = habit?.currentDay || 0;
-  const habitTotal = habit?.targetDays || 66;
   const habitHist = habit?.history || [];
   const habitDone = habitHist.filter(d => d.completed).length;
   const consistency = habitHist.length ? Math.round((habitDone / habitHist.length) * 100) : 0;
 
-  const incomeGoal = goals.find(g => g.category === 'Freelancing' && g.type === 'target' && g.unit === '$');
+  const monthlyIncomeTarget = plan?.income?.monthlyTarget || 0;
 
   const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 17 ? "Good afternoon" : "Good evening";
 
@@ -69,6 +78,10 @@ export default function Dashboard() {
         </p>
       </div>
 
+      {/* Daily insight (refreshes daily) */}
+      <DailyInsightCard goals={goals} yearlyPlan={plan} weeklyPlans={weeklyPlans}
+        habit={habit ? { ...habit, consistency } : null}/>
+
       {/* Stat cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 18 }}>
         {[
@@ -83,24 +96,8 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Income card */}
-      {incomeGoal && (
-        <Card bg={t.bgAccentSofter} border={t.accentBorder} style={{ marginBottom: 18 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <div>
-              <SectionHeader label={`${now.toLocaleString('en', { month: 'long' })} income`}/>
-              <p style={{ fontSize: 30, fontWeight: 800, color: t.text, fontFamily: "'Playfair Display', serif", margin: "4px 0 0", lineHeight: 1.1 }}>
-                ${(incomeGoal.current || 0).toLocaleString()} <span style={{ fontSize: 15, color: t.textTer, fontWeight: 400, fontFamily: "'DM Sans'" }}>/ ${(incomeGoal.target || 0).toLocaleString()}</span>
-              </p>
-            </div>
-            <ProgressRing value={pct(incomeGoal.current || 0, incomeGoal.target || 1)} size={58} stroke={5}/>
-          </div>
-          <ProgressBar value={pct(incomeGoal.current || 0, incomeGoal.target || 1)}/>
-          <p style={{ fontSize: 12, color: t.textSec, margin: "8px 0 0" }}>
-            {paceText(incomeGoal.current || 0, incomeGoal.target || 1, daysLeft)}
-          </p>
-        </Card>
-      )}
+      {/* Earnings card (replaces old income card) */}
+      <EarningsCard monthlyTarget={monthlyIncomeTarget}/>
 
       {/* Goals */}
       {goals.length > 0 ? (

@@ -44,6 +44,17 @@ service cloud.firestore {
     match /sheetLinks/{userId}/{yearMonth}/{doc} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // Daily AI insights (cached per-day per-user)
+    match /dailyInsights/{userId}/{date} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Earnings entries — owner full access, team members can read for leaderboard / leader views
+    match /earnings/{userId}/{yearMonth}/{entryId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
     
     // Monthly reports
     match /monthlyReports/{userId}/{yearMonth} {
@@ -63,6 +74,8 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update: if request.auth != null;
+      allow delete: if request.auth != null
+        && resource.data.assignedBy == request.auth.uid;
     }
     
     // Teams — leader manages, all auth users can read/update (for joining)

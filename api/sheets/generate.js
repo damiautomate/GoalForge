@@ -104,7 +104,18 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('Sheet generation error:', err);
-    res.status(500).json({ error: err.message });
+    const msg = err?.message || String(err);
+    let hint = null;
+
+    if (/caller does not have permission/i.test(msg) || /PERMISSION_DENIED/i.test(msg)) {
+      hint = "The Google service account can't reach Drive/Sheets. In Google Cloud Console → APIs & Services → Library, enable BOTH 'Google Sheets API' AND 'Google Drive API' on the SAME project that owns your service account. Then in Vercel → Project → Settings → Environment Variables, confirm GOOGLE_SERVICE_ACCOUNT_KEY is the full JSON (including the outer braces) and redeploy.";
+    } else if (/invalid_grant|invalid grant|unauthorized_client/i.test(msg)) {
+      hint = "Service account credentials look invalid. Re-download the service account JSON key and replace GOOGLE_SERVICE_ACCOUNT_KEY in Vercel with the full JSON contents.";
+    } else if (/API has not been used|API is not enabled|disabled/i.test(msg)) {
+      hint = "An API the service account uses is not enabled on this Google Cloud project. Enable Google Sheets API AND Google Drive API in the SAME project, then redeploy.";
+    }
+
+    res.status(500).json({ error: msg, hint });
   }
 }
 

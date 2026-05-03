@@ -11,7 +11,9 @@ export async function generateSheet({ userId, userName, monthName, year, tasks, 
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || 'Failed to generate sheet');
+    const e = new Error(err.error || 'Failed to generate sheet');
+    e.hint = err.hint;
+    throw e;
   }
   return res.json();
 }
@@ -24,7 +26,9 @@ export async function syncSheet({ spreadsheetId, tabName, taskCount }) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || 'Failed to sync sheet');
+    const e = new Error(err.error || 'Failed to sync sheet');
+    e.hint = err.hint;
+    throw e;
   }
   return res.json();
 }

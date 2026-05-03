@@ -49,6 +49,15 @@ export async function getFullContext(uid) {
   };
 
   try {
+    // User profile (for enrichment data)
+    const userDoc = await db.doc(`users/${uid}`).get();
+    if (userDoc.exists) {
+      const u = userDoc.data();
+      if (u.profileEnrichment && typeof u.profileEnrichment === 'object') {
+        ctx.profileEnrichment = u.profileEnrichment;
+      }
+    }
+
     // Yearly plan
     const yearDoc = await db.doc(`yearlyPlans/${uid}/${year}/plan`).get();
     if (yearDoc.exists) {

@@ -12,6 +12,7 @@ export default function TrackerPage() {
   const [generating, setGenerating] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
+  const [errorHint, setErrorHint] = useState('');
 
   const uid = auth.currentUser?.uid;
   const user = auth.currentUser;
@@ -46,6 +47,7 @@ export default function TrackerPage() {
   async function handleGenerate() {
     setGenerating(true);
     setError('');
+    setErrorHint('');
     try {
       const dailyIPAs = yearlyPlan?.dailyStructure?.dailyIPAs || [];
       const tasks = goalsToSheetTasks(goals, dailyIPAs);
@@ -82,6 +84,7 @@ export default function TrackerPage() {
     } catch (e) {
       console.error(e);
       setError(e.message || 'Failed to generate sheet');
+      if (e.hint) setErrorHint(e.hint);
     }
     setGenerating(false);
   }
@@ -90,6 +93,7 @@ export default function TrackerPage() {
     if (!sheetInfo) return;
     setSyncing(true);
     setError('');
+    setErrorHint('');
     try {
       const data = await syncSheet({
         spreadsheetId: sheetInfo.spreadsheetId,
@@ -116,6 +120,7 @@ export default function TrackerPage() {
     } catch (e) {
       console.error(e);
       setError(e.message || 'Failed to sync');
+      if (e.hint) setErrorHint(e.hint);
     }
     setSyncing(false);
   }
@@ -131,8 +136,13 @@ export default function TrackerPage() {
       </div>
 
       {error && (
-        <Card bg={t.dangerBg} style={{ marginBottom: 14, padding: "12px 16px" }}>
-          <p style={{ fontSize: 13, color: t.danger, margin: 0 }}>{error}</p>
+        <Card bg={t.dangerBg} style={{ marginBottom: 14, padding: "14px 16px" }}>
+          <p style={{ fontSize: 13, color: t.danger, margin: 0, fontWeight: 600 }}>{error}</p>
+          {errorHint && (
+            <p style={{ fontSize: 12, color: t.text, margin: "8px 0 0", lineHeight: 1.55 }}>
+              <span style={{ fontWeight: 700 }}>How to fix:</span> {errorHint}
+            </p>
+          )}
         </Card>
       )}
 

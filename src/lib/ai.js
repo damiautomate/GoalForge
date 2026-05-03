@@ -52,6 +52,180 @@ function parseJSON(text) {
   }
 }
 
+// ─── Generate Monthly Plan (all weeks at once) ───
+// Returns { weeks: [{ weekNumber, theme, insight, actions: [...] }, ...] }
+// `priorWeeks` is an optional array of already-completed/edited weeks (with their action completion state)
+// so the AI can adjust later weeks based on what actually happened.
+export async function generateMonthlyPlan(monthlyGoals, yearlyPlan, totalWeeks, priorWeeks = []) {
+  const system = `You are a goal planning assistant. You break down monthly goals into a multi-week roadmap for the entire month.
+
+Rules:
+- Plan ${totalWeeks} weeks total.
+- Front-load goals that need momentum, pace habits steadily, save reflection/cleanup for the last week.
+- Each week has its own 2-4 word theme and 1-2 sentence insight.
+- 4-7 specific, completable actions per week.
+- Each action MUST link to a specific monthly goal by goalId.
+- Each action gets a priority (high/medium/low), a suggested day-of-week (Monday..Sunday or null if flexible), and a time block (morning/afternoon/evening/null).
+- If priorWeeks data is provided, take it into account: if a goal is behind pace, push more actions for it; if ahead, ease off.
+- Return ONLY valid JSON, no other text.
+
+Respond with this exact JSON structure:
+{
+  "weeks": [
+    {
+      "weekNumber": 1,
+      "theme": "string",
+      "insight": "string",
+      "actions": [
+        {
+          "title": "string",
+          "goalId": "string",
+          "goalTitle": "string",
+          "priority": "high" | "medium" | "low",
+          "day": "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday" | null,
+          "timeBlock": "morning" | "afternoon" | "evening" | null,
+          "estimatedMinutes": number
+        }
+      ]
+    }
+  ]
+}`;
+
+  const goalsText = monthlyGoals.map(g => {
+    const pctDone = g.target ? Math.round(((g.current || 0) / g.target) * 100) : 0;
+    return `- ${g.title} (${g.type}): ${g.current || 0}/${g.target} ${g.unit || ''} [${pctDone}% done] — ID: ${g.id}`;
+  }).join('\n');
+
+  const yearContext = yearlyPlan ? `
+User's yearly vision: ${yearlyPlan.vision || 'Not set'}
+Word of the year: ${yearlyPlan.wordOfYear || 'Not set'}
+Yearly income goal: $${yearlyPlan.income?.total || 0}
+` : '';
+
+  const priorText = priorWeeks?.length
+    ? '\n\nPRIOR WEEKS (already happened, adjust later weeks accordingly):\n' +
+      priorWeeks.map(w => {
+        const total = (w.actions || []).length;
+        const done = (w.actions || []).filter(a => a.completed).length;
+        return `Week ${w.weekNumber} — theme: ${w.theme || '?'} — actions completed: ${done}/${total}`;
+      }).join('\n')
+    : '';
+
+  const message = `Plan ${totalWeeks} weeks for this month.
+
+Monthly Goals:
+${goalsText}
+${yearContext}${priorText}
+
+Return all ${totalWeeks} weeks at once as a coherent monthly roadmap.`;
+
+  const response = await callAI(system, message);
+  return parseJSON(response);
+}
+
+// ─── Regenerate a single week (with prior weeks as context) ───
+export async function regenerateSingleWeek(monthlyGoals, yearlyPlan, weekNumber, totalWeeks, priorWeeks = []) {
+  const system = `You are a goal planning assistant. Regenerate a single week's actions given the goals, the prior weeks, and the position in the month.
+
+Rules:
+- Output ONLY this week.
+- Take prior weeks into account: if a goal is behind, push for it; if a goal is ahead, ease.
+- 4-7 specific actions, each linked to a monthly goal.
+- Each action gets priority, day (or null), time block (or null), and estimatedMinutes.
+- Return ONLY valid JSON.
+
+Respond with this exact JSON structure:
+{
+  "weekNumber": ${weekNumber},
+  "theme": "string",
+  "insight": "string",
+  "actions": [
+    { "title": "string", "goalId": "string", "goalTitle": "string", "priority": "high"|"medium"|"low",
+      "day": "Monday"|"Tuesday"|"Wednesday"|"Thursday"|"Friday"|"Saturday"|"Sunday"|null,
+      "timeBlock": "morning"|"afternoon"|"evening"|null, "estimatedMinutes": number }
+  ]
+}`;
+
+  const goalsText = monthlyGoals.map(g => {
+    const pctDone = g.target ? Math.round(((g.current || 0) / g.target) * 100) : 0;
+    return `- ${g.title} (${g.type}): ${g.current || 0}/${g.target} ${g.unit || ''} [${pctDone}% done] — ID: ${g.id}`;
+  }).join('\n');
+
+  const priorText = priorWeeks?.length
+    ? priorWeeks.map(w => {
+      const total = (w.actions || []).length;
+      const done = (w.actions || []).filter(a => a.completed).length;
+      return `Week ${w.weekNumber} — theme: ${w.theme || '?'} — actions completed: ${done}/${total}`;
+    }).join('\n')
+    : 'None yet.';
+
+  const message = `Regenerate Week ${weekNumber} of ${totalWeeks}.
+
+Monthly Goals:
+${goalsText}
+
+Prior weeks:
+${priorText}
+
+Yearly vision: ${yearlyPlan?.vision || '—'}`;
+
+  const response = await callAI(system, message);
+  return parseJSON(response);
+}
+
+// ─── Daily insight (refreshes each day) ───
+// Short, focused, references actual current numbers. Shows on Dashboard.
+export async function generateDailyInsight({ goals, yearlyPlan, weeklyPlans, habit, dayOfWeek, daysLeftInMonth }) {
+  const system = `You are a personal coach. Each morning you give the user ONE short insight (2-3 sentences max) that's specific to where they are RIGHT NOW.
+
+Rules:
+- Reference an actual number (their progress %, days left, behind/ahead pace).
+- Pick the single most important thing to focus on TODAY.
+- Be direct, not generic. No fluff.
+- Vary tone day-to-day — sometimes affirming, sometimes pushing, sometimes a question.
+- Return ONLY valid JSON.
+
+Respond with:
+{
+  "headline": "string — 2-5 word punchy headline",
+  "insight": "string — 2-3 sentences referencing real numbers",
+  "focus": "string — 'Today, do X' (one sentence)"
+}`;
+
+  const goalsText = (goals || []).map(g => {
+    const pctDone = g.target ? Math.round(((g.current || 0) / g.target) * 100) : 0;
+    const pace = g.target ? ((g.target - (g.current || 0)) / Math.max(daysLeftInMonth, 1)).toFixed(1) : '?';
+    return `- ${g.title}: ${g.current || 0}/${g.target} ${g.unit || ''} (${pctDone}%) — needs ${pace}/day to finish`;
+  }).join('\n') || 'No goals set yet.';
+
+  const weeklyText = (weeklyPlans || []).map(w => {
+    const total = (w.actions || []).length;
+    const done = (w.actions || []).filter(a => a.completed).length;
+    return `Week ${w.weekNumber}: ${done}/${total} actions done — ${w.theme || ''}`;
+  }).join('\n') || 'No weekly plans yet.';
+
+  const habitText = habit
+    ? `66-day habit "${habit.title}": Day ${habit.currentDay}/${habit.targetDays}, consistency ${habit.consistency || 0}%.`
+    : 'No active 66-day habit.';
+
+  const message = `Today is ${dayOfWeek}, ${daysLeftInMonth} days remain in the month.
+
+Goals:
+${goalsText}
+
+Weekly plan progress:
+${weeklyText}
+
+${habitText}
+
+Yearly word: ${yearlyPlan?.wordOfYear || '—'}.
+
+Give the user one short, specific insight for today.`;
+
+  const response = await callAI(system, message);
+  return parseJSON(response);
+}
+
 // ─── Generate Weekly Breakdown from Monthly Goals ───
 export async function generateWeeklyPlan(monthlyGoals, yearlyPlan, currentWeek, daysLeftInMonth) {
   const system = `You are a goal planning assistant. You help users break down their monthly goals into actionable weekly plans.
