@@ -137,6 +137,9 @@ export async function generateCoachMessage(phase, ctx, conversationHistory = [],
     case 'habit_warning':
       userContent = `[SYSTEM: CRITICAL — The user missed their 66-day habit yesterday. If they miss today, the counter resets to zero. Make this urgent but supportive.]`;
       break;
+    case 'behind_pace':
+      userContent = `[SYSTEM: PACE ALERT — Mid-month check. Their average goal completion is significantly below where they should be by this point in the month. Reference the gap with actual numbers (e.g. "You're at 32% but should be at 60% by day 18"). Suggest the ONE goal to focus on this week to claw back. Firm but caring.]`;
+      break;
     case 'task_completed':
       userContent = userMessage; // Context about what was completed
       break;

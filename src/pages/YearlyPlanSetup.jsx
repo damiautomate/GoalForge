@@ -24,10 +24,60 @@ const INITIAL = {
   reviewDay: '15', accountabilityPartner: '', monthlyReview: true,
 };
 
-export default function YearlyPlanSetup({ onComplete }) {
+// Maps a saved yearly plan document back into the flat form shape used here.
+function planToForm(plan) {
+  if (!plan) return INITIAL;
+  const inc = plan.income || {};
+  const nm = plan.networkMarketing || {};
+  const fr = plan.freelancing || {};
+  const pd = plan.personalDev || {};
+  const ds = plan.dailyStructure || {};
+  const cm = plan.commitment || {};
+  return {
+    wordOfYear: plan.wordOfYear || '',
+    vision: plan.vision || '',
+    motivation: plan.motivation || '',
+    incomeTotal: inc.total ? String(inc.total) : '',
+    incomeMin: inc.minimum ? String(inc.minimum) : '',
+    incomeRealistic: inc.realistic ? String(inc.realistic) : '',
+    incomeDream: inc.dream ? String(inc.dream) : '',
+    nmCurrentSize: nm.currentTeamSize ? String(nm.currentTeamSize) : '',
+    nmTargetSize: nm.targetTeamSize ? String(nm.targetTeamSize) : '',
+    nmCurrentRank: nm.currentRank || '',
+    nmTargetRank: nm.targetRank || '',
+    nmRecruitPace: nm.recruitmentPace || '',
+    nmIncomeGoal: nm.incomeGoal || '',
+    nmQ1: nm.quarterlyRanks?.q1 || '',
+    nmQ2: nm.quarterlyRanks?.q2 || '',
+    nmQ3: nm.quarterlyRanks?.q3 || '',
+    nmQ4: nm.quarterlyRanks?.q4 || '',
+    nmWhy: nm.why || '',
+    frPlatforms: fr.platforms || '',
+    frSkills: fr.skills || '',
+    frIncomeGoal: fr.incomeGoal || '',
+    frProjectsPace: fr.projectsPace || '',
+    frAvgPerProject: fr.avgPerProject || '',
+    frReviewTarget: fr.reviewTarget || '',
+    frWhy: fr.why || '',
+    pdGoal: pd.goal || '',
+    pdBooks: (pd.books || []).join('\n'),
+    pdCourses: pd.courses || '',
+    pdEvents: pd.events || '',
+    pdWhy: pd.why || '',
+    gamePlan: ds.gamePlan || '',
+    habitLock: ds.habitLock || '',
+    dailyIPAs: (ds.dailyIPAs || []).join('\n'),
+    dailyWhy: ds.why || '',
+    reviewDay: cm.reviewDay ? String(cm.reviewDay) : '15',
+    accountabilityPartner: cm.accountabilityPartner || '',
+    monthlyReview: cm.monthlyReview !== undefined ? cm.monthlyReview : true,
+  };
+}
+
+export default function YearlyPlanSetup({ onComplete, onCancel, initial, editMode }) {
   const t = useTheme();
   const [step, setStep] = useState(0);
-  const [data, setData] = useState(INITIAL);
+  const [data, setData] = useState(() => initial ? planToForm(initial) : INITIAL);
   const [saving, setSaving] = useState(false);
 
   const set = (key) => (val) => setData(prev => ({ ...prev, [key]: val }));
@@ -253,7 +303,7 @@ export default function YearlyPlanSetup({ onComplete }) {
         )}
         {isLast ? (
           <Button onClick={handleSave} disabled={saving} style={{ flex: 2 }}>
-            {saving ? 'Saving your plan...' : '🚀 Launch my year'}
+            {saving ? 'Saving your plan...' : (editMode ? '💾 Save changes' : '🚀 Launch my year')}
           </Button>
         ) : (
           <Button onClick={() => setStep(step + 1)} style={{ flex: step > 0 ? 2 : 1 }}>
@@ -261,6 +311,22 @@ export default function YearlyPlanSetup({ onComplete }) {
           </Button>
         )}
       </div>
+
+      {editMode && onCancel && (
+        <button onClick={onCancel} disabled={saving} style={{
+          width: '100%', padding: '12px', marginTop: 16,
+          background: 'none', border: 'none', color: t.textTer,
+          fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+        }}>Cancel — discard changes</button>
+      )}
+
+      {editMode && !isLast && (
+        <button onClick={handleSave} disabled={saving} style={{
+          width: '100%', padding: '12px', marginTop: 8,
+          background: 'none', border: `1px solid ${t.border}`, borderRadius: 12,
+          color: t.success, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+        }}>{saving ? 'Saving...' : '💾 Save without finishing tour'}</button>
+      )}
     </div>
   );
 }

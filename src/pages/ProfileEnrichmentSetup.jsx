@@ -38,22 +38,23 @@ const FOCUS_STYLES = [
 ];
 
 // One-time post-signup setup. Shown before YearlyPlanSetup.
+// Also reusable as an edit page (pass `initial` + `editMode`).
 // Fields are saved to users/{uid}.profileEnrichment + hasEnrichedProfile = true.
-export default function ProfileEnrichmentSetup({ onComplete, onSkip }) {
+export default function ProfileEnrichmentSetup({ onComplete, onSkip, initial, editMode }) {
   const t = useTheme();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [data, setData] = useState({
-    careerLevel: '',
-    lifeStage: '',
-    incomeTier: '',
-    achievements: '',     // free-form past wins
-    certifications: '',   // optional
-    hoursPerDay: '',      // number
-    bestTimeOfDay: '',
-    focusStyle: '',
-    notes: '',            // free-form for AI
-  });
+  const [data, setData] = useState(() => ({
+    careerLevel: initial?.careerLevel || '',
+    lifeStage: initial?.lifeStage || '',
+    incomeTier: initial?.incomeTier || '',
+    achievements: initial?.achievements || '',
+    certifications: initial?.certifications || '',
+    hoursPerDay: initial?.hoursPerDay != null ? String(initial.hoursPerDay) : '',
+    bestTimeOfDay: initial?.bestTimeOfDay || '',
+    focusStyle: initial?.focusStyle || '',
+    notes: initial?.notes || '',
+  }));
 
   const set = (key) => (val) => setData(prev => ({ ...prev, [key]: val }));
   const cur = STEPS[step];
@@ -231,18 +232,27 @@ export default function ProfileEnrichmentSetup({ onComplete, onSkip }) {
         )}
         {isLast ? (
           <Button onClick={save} disabled={saving} style={{ flex: 2 }}>
-            {saving ? 'Saving...' : 'Continue to yearly plan →'}
+            {saving ? 'Saving...' : (editMode ? 'Save changes' : 'Continue to yearly plan →')}
           </Button>
         ) : (
           <Button onClick={() => setStep(step + 1)} style={{ flex: step > 0 ? 2 : 1 }}>Continue →</Button>
         )}
       </div>
 
-      <button onClick={skipForNow} disabled={saving} style={{
-        width: '100%', padding: '12px', marginTop: 16,
-        background: 'none', border: 'none', color: t.textTer,
-        fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-      }}>Skip for now — I'll fill this in later</button>
+      {!editMode && (
+        <button onClick={skipForNow} disabled={saving} style={{
+          width: '100%', padding: '12px', marginTop: 16,
+          background: 'none', border: 'none', color: t.textTer,
+          fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+        }}>Skip for now — I'll fill this in later</button>
+      )}
+      {editMode && onSkip && (
+        <button onClick={onSkip} disabled={saving} style={{
+          width: '100%', padding: '12px', marginTop: 16,
+          background: 'none', border: 'none', color: t.textTer,
+          fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+        }}>Cancel</button>
+      )}
     </div>
   );
 }

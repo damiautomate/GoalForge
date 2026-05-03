@@ -7,7 +7,7 @@ import { getLeaderboard } from '../lib/team';
 // `enabled` comes from the team config; if false, we don't render at all.
 // `showTop` defaults to 5; you can pass 10.
 // `isLeader` lets the leader peek even if not in top N.
-export default function Leaderboard({ teamId, leaderUid, enabled, showTop = 5, currentUserUid }) {
+export default function Leaderboard({ teamId, leaderUid, enabled, showTop = 5, currentUserUid, onMemberClick }) {
   const t = useTheme();
   const [rows, setRows] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -49,26 +49,27 @@ export default function Leaderboard({ teamId, leaderUid, enabled, showTop = 5, c
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {top.map((r, i) => <Row key={r.uid} rank={i + 1} row={r} t={t}
-          isYou={r.uid === currentUserUid}/>)}
+          isYou={r.uid === currentUserUid} onClick={onMemberClick}/>)}
       </div>
 
       {ownRow && !ownInTop && (
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px dashed ${t.border}` }}>
-          <Row rank={ownRank} row={ownRow} t={t} isYou={true}/>
+          <Row rank={ownRank} row={ownRow} t={t} isYou={true} onClick={onMemberClick}/>
         </div>
       )}
     </Card>
   );
 }
 
-function Row({ rank, row, t, isYou }) {
+function Row({ rank, row, t, isYou, onClick }) {
   const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
   return (
-    <div style={{
+    <div onClick={onClick ? () => onClick(row) : undefined} style={{
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '8px 12px', borderRadius: 10,
       background: isYou ? t.bgAccentSofter : t.bgSurface,
       border: `1px solid ${isYou ? t.accentBorder : t.borderLt}`,
+      cursor: onClick ? 'pointer' : 'default',
     }}>
       <span style={{ fontSize: 14, fontWeight: 700, color: t.text, width: 30, textAlign: 'center' }}>{medal}</span>
       <div style={{ flex: 1 }}>

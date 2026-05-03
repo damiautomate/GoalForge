@@ -8,6 +8,7 @@ import {
 } from '../lib/team';
 import AssignTaskModal from './AssignTaskModal';
 import Leaderboard from './Leaderboard';
+import MemberDetailModal from './MemberDetailModal';
 
 // Leader-specific dashboard: shown above/instead of the regular Team tab content for leaders.
 // Includes: members behind pace, top earner, leaderboard toggle, fines dashboard,
@@ -22,6 +23,7 @@ export default function LeadDashboard({ team, profile, onChange }) {
   const [board, setBoard] = useState([]);
   const [showAssign, setShowAssign] = useState(false);
   const [editTask, setEditTask] = useState(null);
+  const [openMember, setOpenMember] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -106,9 +108,9 @@ export default function LeadDashboard({ team, profile, onChange }) {
           <SectionHeader label="Members falling behind" color={t.danger}/>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
             {behind.slice(0, 5).map(m => (
-              <div key={m.uid} style={{
+              <div key={m.uid} onClick={() => setOpenMember(m)} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                background: t.bgCard, padding: '8px 12px', borderRadius: 8,
+                background: t.bgCard, padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
               }}>
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: t.text, margin: 0 }}>{m.name}</p>
@@ -116,7 +118,7 @@ export default function LeadDashboard({ team, profile, onChange }) {
                     {m.avgProgress}% (expected {m.expected}%) · {m.gap} pts behind
                   </p>
                 </div>
-                <Badge label="Nudge" color={t.danger} bg={t.dangerBg}/>
+                <Badge label="Open ›" color={t.danger} bg={t.dangerBg}/>
               </div>
             ))}
           </div>
@@ -129,13 +131,13 @@ export default function LeadDashboard({ team, profile, onChange }) {
           <SectionHeader label="Outstanding fines" color={t.danger}/>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
             {fines.map(f => (
-              <div key={f.uid} style={{
+              <div key={f.uid} onClick={() => setOpenMember({ uid: f.uid, name: f.name })} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '8px 12px', borderRadius: 8, background: t.bgSurface,
+                padding: '8px 12px', borderRadius: 8, background: t.bgSurface, cursor: 'pointer',
               }}>
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 600, color: t.text, margin: 0 }}>{f.name}</p>
-                  <p style={{ fontSize: 11, color: t.textTer, margin: '1px 0 0' }}>{f.overdueCount} overdue</p>
+                  <p style={{ fontSize: 11, color: t.textTer, margin: '1px 0 0' }}>{f.overdueCount} overdue · tap for details</p>
                 </div>
                 <span style={{ fontSize: 14, fontWeight: 700, color: t.danger }}>₦{f.total.toLocaleString()}</span>
               </div>
@@ -174,7 +176,8 @@ export default function LeadDashboard({ team, profile, onChange }) {
       {/* Leaderboard preview always visible to leader, even if disabled for the team */}
       {board.length > 0 && (
         <Leaderboard teamId={team.id} leaderUid={uid}
-          enabled={true} showTop={10} currentUserUid={uid}/>
+          enabled={true} showTop={10} currentUserUid={uid}
+          onMemberClick={(row) => setOpenMember({ uid: row.uid, name: row.name, memberId: row.memberId })}/>
       )}
 
       {/* Assigned tasks management */}
@@ -227,6 +230,10 @@ export default function LeadDashboard({ team, profile, onChange }) {
 
       {editTask && (
         <EditTaskModal task={editTask} onClose={() => setEditTask(null)} onSave={handleSaveEdit}/>
+      )}
+
+      {openMember && (
+        <MemberDetailModal member={openMember} onClose={() => setOpenMember(null)}/>
       )}
     </div>
   );

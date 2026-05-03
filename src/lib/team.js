@@ -258,6 +258,66 @@ export async function completeAssignedTask({ taskId, uid, proof = '' }) {
   return true;
 }
 
+// ── Deep stats for a single member (leader drilldown) ──
+export async function getMemberDeepStats(uid) {
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const today = now.toISOString().slice(0, 10);
+
+  const out = {
+    uid,
+    goals: [],
+    habit: null,
+    todayProgress: 0,
+    earningsThisMonth: 0,
+    earningsBreakdown: {},
+    weeklyPlans: [],
+  };
+
+  try {
+    const [goalsSnap, habitsSnap, todayDoc, earningsSnap] = await Promise.all([
+      getDocs(collection(db, 'monthlyGoals', uid, ym)),
+      getDocs(collection(db, 'habits66', uid)),
+      getDoc(doc(db, 'dailyTasks', uid, today)),
+      getDocs(collection(db, 'earnings', uid, ym)).catch(() => ({ forEach: () => {} })),
+    ]);
+
+    goalsSnap.forEach(d => out.goals.push({ id: d.id, ...d.data() }));
+    habitsSnap.forEach(d => {
+      const h = d.data();
+      if (h.status === 'active') {
+        const hist = h.history || [];
+        const done = hist.filter(x => x.completed).length;
+        out.habit = {
+          title: h.title,
+          currentDay: h.currentDay,
+          targetDays: h.targetDays,
+          consistency: hist.length ? Math.round((done / hist.length) * 100) : 0,
+          resets: h.resets || 0,
+        };
+      }
+    });
+    if (todayDoc.exists()) {
+      out.todayProgress = Math.round((todayDoc.data().progress || 0) * 100);
+    }
+    earningsSnap.forEach(d => {
+      const e = d.data();
+      out.earningsThisMonth += (e.amount || 0);
+      out.earningsBreakdown[e.source || 'Other'] = (out.earningsBreakdown[e.source || 'Other'] || 0) + (e.amount || 0);
+    });
+
+    // Weekly plans for the month
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const totalWeeks = Math.ceil(daysInMonth / 7);
+    for (let w = 1; w <= totalWeeks; w++) {
+      const wSnap = await getDoc(doc(db, 'weeklyPlans', uid, ym, `week${w}`));
+      if (wSnap.exists()) out.weeklyPlans.push({ weekNumber: w, ...wSnap.data() });
+    }
+  } catch (e) { console.error('Deep stats error:', e); }
+
+  return out;
+}
+
 // ── Edit / delete an assigned task (leader only) ──
 export async function updateAssignedTask(taskId, updates) {
   await updateDoc(doc(db, 'assignedTasks', taskId), updates);
