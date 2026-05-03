@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
   const phase = req.query.phase;
   if (!phase) {
-    return res.status(400).json({ error: 'Missing ?phase=. Use: morning, midday, evening, night_review, zero_progress, habit_warning' });
+    return res.status(400).json({ error: 'Missing ?phase=. Use: morning, midday, evening, night_review, zero_progress, habit_warning, behind_pace' });
   }
 
   console.log(`⏰ Cron: phase=${phase}`);
@@ -47,6 +47,22 @@ export default async function handler(req, res) {
         if (phase === 'habit_warning' && !ctx.activeHabit?.missedYesterday) {
           results.push({ uid: user.uid, status: 'skipped', reason: 'no_risk' });
           continue;
+        }
+        if (phase === 'behind_pace') {
+          // Only ping users whose avg goal progress is at least 25 points behind expected pace
+          const now = new Date();
+          const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          const expected = Math.round((now.getDate() / dim) * 100);
+          const goals = ctx.monthlyGoals || [];
+          if (goals.length === 0) {
+            results.push({ uid: user.uid, status: 'skipped', reason: 'no_goals' });
+            continue;
+          }
+          const avg = Math.round(goals.reduce((s, g) => s + (g.pct || 0), 0) / goals.length);
+          if (avg >= expected - 25) {
+            results.push({ uid: user.uid, status: 'skipped', reason: `on_pace (${avg}/${expected})` });
+            continue;
+          }
         }
 
         const history = await getConversationHistory(user.uid);

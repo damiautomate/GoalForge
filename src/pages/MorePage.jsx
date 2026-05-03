@@ -9,6 +9,7 @@ const MENU = [
   { k: 'team', icon: '👥', title: 'Team', desc: 'Members, assigned tasks, fines', color: 'purple' },
   { k: 'analytics', icon: '📊', title: 'Analytics & History', desc: 'Trends, reports, AI insights', color: 'info' },
   { k: 'yearly', icon: '🌟', title: 'Yearly Plan', desc: 'Your vision and roadmap', color: 'success' },
+  { k: 'profile', icon: '🪪', title: 'Profile', desc: 'What your AI coach knows about you', color: 'accent' },
 ];
 
 export default function MorePage({ setView, isDark, toggleTheme }) {
@@ -133,16 +134,15 @@ export default function MorePage({ setView, isDark, toggleTheme }) {
         </Card>
       )}
 
-      {/* Profile info */}
-      <Card style={{ marginBottom: 12 }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: t.textTer, textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 10px" }}>Profile</p>
-        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: 13 }}>
-          <span style={{ color: t.textSec }}>Name</span>
-          <span style={{ color: t.text, fontWeight: 500 }}>{user?.displayName || '—'}</span>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: 13 }}>
-          <span style={{ color: t.textSec }}>Email</span>
-          <span style={{ color: t.text, fontWeight: 500 }}>{user?.email || '—'}</span>
+      {/* Profile summary (tap to open full profile) */}
+      <Card onClick={() => setView('profile')} style={{ marginBottom: 12, cursor: 'pointer' }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: t.textTer, textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 6px" }}>Profile</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: t.text, margin: 0 }}>{user?.displayName || '—'}</p>
+            <p style={{ fontSize: 12, color: t.textSec, margin: "2px 0 0" }}>{user?.email || '—'}</p>
+          </div>
+          <span style={{ color: t.textTer, fontSize: 20 }}>›</span>
         </div>
       </Card>
 

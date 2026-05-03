@@ -12,6 +12,7 @@ import TeamPage from './pages/TeamPage';
 import HabitPage from './pages/HabitPage';
 import YearlyPage from './pages/YearlyPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import ProfilePage from './pages/ProfilePage';
 import MorePage from './pages/MorePage';
 import Nav from './components/Nav';
 
@@ -66,7 +67,8 @@ export default function App() {
               {view === 'team' && <TeamPage/>}
               {view === 'habit' && <HabitPage/>}
               {view === 'analytics' && <AnalyticsPage/>}
-              {view === 'yearly' && <YearlyPage/>}
+              {view === 'yearly' && <YearlyPage setView={setView}/>}
+              {view === 'profile' && <ProfilePage/>}
               {view === 'more' && <MorePage setView={setView} isDark={isDark} toggleTheme={() => setIsDark(!isDark)}/>}
             </div>
             <Nav active={view} setActive={setView}/>

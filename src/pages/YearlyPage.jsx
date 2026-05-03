@@ -1,27 +1,40 @@
 import { useState, useEffect } from 'react';
 import { auth, db, doc, getDoc } from '../lib/firebase';
-import { useTheme, Card, ProgressBar, SectionHeader, PageTitle, pct } from '../lib/theme';
-import { signOut } from 'firebase/auth';
+import { useTheme, Card, Button, SectionHeader, PageTitle } from '../lib/theme';
+import YearlyPlanSetup from './YearlyPlanSetup';
 
 export default function YearlyPage() {
   const t = useTheme();
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const uid = auth.currentUser.uid;
-      const year = String(new Date().getFullYear());
-      try {
-        const snap = await getDoc(doc(db, 'yearlyPlans', uid, year, 'plan'));
-        if (snap.exists()) setPlan(snap.data());
-      } catch (e) { console.error(e); }
-      setLoading(false);
-    })();
-  }, []);
+  async function reload() {
+    setLoading(true);
+    const uid = auth.currentUser.uid;
+    const year = String(new Date().getFullYear());
+    try {
+      const snap = await getDoc(doc(db, 'yearlyPlans', uid, year, 'plan'));
+      if (snap.exists()) setPlan(snap.data());
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }
+
+  useEffect(() => { reload(); }, []);
 
   if (loading) return <div style={{ padding: "40px 20px", textAlign: "center", color: t.textTer }}>Loading...</div>;
   if (!plan) return <div style={{ padding: "40px 20px", textAlign: "center", color: t.textTer }}>No yearly plan found.</div>;
+
+  if (editing) {
+    return (
+      <YearlyPlanSetup
+        initial={plan}
+        editMode
+        onComplete={() => { setEditing(false); reload(); }}
+        onCancel={() => setEditing(false)}
+      />
+    );
+  }
 
   const user = auth.currentUser;
   const nm = plan.networkMarketing || {};
@@ -54,7 +67,7 @@ export default function YearlyPage() {
 
   return (
     <div style={{ padding: "0 20px 24px" }}>
-      <div style={{ padding: "28px 0 22px" }}>
+      <div style={{ padding: "28px 0 18px" }}>
         <SectionHeader label={`${plan.year || new Date().getFullYear()} Goal Plan`} color={t.purple}/>
         <PageTitle>Year at a Glance</PageTitle>
         <p style={{ fontSize: 13, color: t.textTer, margin: "6px 0 0" }}>
@@ -62,6 +75,10 @@ export default function YearlyPage() {
           {plan.wordOfYear && <> · Word: <span style={{ color: t.purple, fontWeight: 600 }}>{plan.wordOfYear}</span></>}
         </p>
       </div>
+
+      <Button variant="secondary" onClick={() => setEditing(true)} style={{ marginBottom: 16 }}>
+        ✎ Edit yearly plan
+      </Button>
 
       {/* Vision */}
       <Card bg={t.purpleBg} border={t.purpleBdr} style={{ marginBottom: 14 }}>

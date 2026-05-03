@@ -8,7 +8,7 @@ const ITEMS = [
   { k: "more", l: "More", d: "M4 6h16M4 12h16M4 18h16" },
 ];
 
-const MORE_ACTIVE = ['habit', 'team', 'analytics', 'yearly', 'more'];
+const MORE_ACTIVE = ['habit', 'team', 'analytics', 'yearly', 'profile', 'more'];
 
 export default function Nav({ active, setActive }) {
   const t = useTheme();
